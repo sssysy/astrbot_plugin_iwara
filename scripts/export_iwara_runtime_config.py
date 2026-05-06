@@ -186,7 +186,9 @@ def main() -> int:
         if args.proxy.strip():
             launch_kwargs["proxy"] = {"server": args.proxy.strip()}
 
-        context = browser_type.launch_persistent_context(str(profile_dir), **launch_kwargs)
+        context = browser_type.launch_persistent_context(
+            str(profile_dir), **launch_kwargs
+        )
         try:
             page = context.new_page()
             page.goto("https://www.iwara.tv/", wait_until="domcontentloaded")

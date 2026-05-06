@@ -5,6 +5,9 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - 视频/图片搜索
 - 视频详情、图片详情查询
 - 视频直链解析（按报告中的 `X-Version` 算法）
+- 相关视频、评论列表、点赞用户查询
+- 热门内容（视频/图片）
+- 用户资料查询
 - 图文消息链返回（搜索、详情、直链尽量附封面）
 - 可选代理与图片打码等级配置
 
@@ -14,13 +17,24 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_video <视频ID或链接>`
 - `/iwara_image <图片ID或链接>`
 - `/iwara_direct <视频ID或链接>`
+- `/iwara_related <视频ID或链接>`
+- `/iwara_comments <视频ID或链接>`
+- `/iwara_likes <视频ID或链接>`
+- `/iwara_trending [video|image|all]`
+- `/iwara_user <用户名>`
 - `/iwara_probe`
+- `/iwara_diag`
 
 示例：
 
 - `/iwara_search all miku`
 - `/iwara_video vsGv0RRqM4mVhE`
 - `/iwara_direct https://www.iwara.tv/video/vsGv0RRqM4mVhE`
+- `/iwara_related vsGv0RRqM4mVhE`
+- `/iwara_comments vsGv0RRqM4mVhE`
+- `/iwara_likes vsGv0RRqM4mVhE`
+- `/iwara_trending video`
+- `/iwara_user nightmate71`
 - `/iwara_probe`
 
 ## 配置
