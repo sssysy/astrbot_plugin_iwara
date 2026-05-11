@@ -23,12 +23,30 @@ from .iwara_helpers import (
 )
 
 
+_CF_ERROR_KW = ("cloudflare", "cf-chl", "just a moment", "cf-mitigated", "turnstile", "challenges.cloudflare.com")
+
+
+def _is_cf_error_text(text: str) -> bool:
+    lower = (text or "").lower()
+    return any(kw in lower for kw in _CF_ERROR_KW)
+
+
+class CloudflareBlocked(RuntimeError):
+    """Cloudflare 拦截：aiohttp 与 cloudscraper 均失败，不再尝试其他 base URL。"""
+    pass
+
+
 class IwaraAPI:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self._session: Optional[aiohttp.ClientSession] = None
         self._scraper = None
         self._warmup_done = False
+        self._warmup_lock = asyncio.Lock()
+
+    @property
+    def warmup_done(self) -> bool:
+        return self._warmup_done
 
     async def close(self):
         if self._session and not self._session.closed:
@@ -55,6 +73,8 @@ class IwaraAPI:
             url = f"{base.rstrip('/')}/{path.lstrip('/')}"
             try:
                 return await self._request_once(url=url, params=params, headers=headers)
+            except CloudflareBlocked:
+                raise
             except Exception as exc:
                 last_exc = exc
                 if idx < len(bases) - 1 and self._is_retryable(exc):
@@ -93,7 +113,15 @@ class IwaraAPI:
                     logger.warning(
                         "aiohttp got Cloudflare challenge, retry via cloudscraper."
                     )
-                    return await self._via_cloudscraper(url, params, merged, px)
+                    try:
+                        return await self._via_cloudscraper(url, params, merged, px)
+                    except Exception as cs_exc:
+                        err_text = str(cs_exc)
+                        if _is_cf_error_text(err_text) or "403" in err_text:
+                            raise CloudflareBlocked(
+                                format_http_error(resp.status, content, bool(px), self.config)
+                            ) from cs_exc
+                        raise
                 raise RuntimeError(
                     format_http_error(resp.status, content, bool(px), self.config)
                 )
@@ -125,24 +153,27 @@ class IwaraAPI:
     ):
         if self._warmup_done:
             return
-        if not get_bool_config(self.config, "warmup_homepage", True):
-            self._warmup_done = True
-            return
-        warmup_url = (
-            get_str_config(self.config, "request_referer", "https://www.iwara.tv/")
-            or "https://www.iwara.tv/"
-        )
-        px = proxy_url(self.config)
-        try:
-            async with session.get(
-                warmup_url, headers=headers, proxy=px, allow_redirects=True
-            ) as resp:
-                await resp.text()
-                logger.info(f"iwara warmup status: {resp.status}")
-        except Exception as exc:
-            logger.warning(f"iwara warmup failed: {exc}")
-        finally:
-            self._warmup_done = True
+        async with self._warmup_lock:
+            if self._warmup_done:
+                return
+            if not get_bool_config(self.config, "warmup_homepage", True):
+                self._warmup_done = True
+                return
+            warmup_url = (
+                get_str_config(self.config, "request_referer", "https://www.iwara.tv/")
+                or "https://www.iwara.tv/"
+            )
+            px = proxy_url(self.config)
+            try:
+                async with session.get(
+                    warmup_url, headers=headers, proxy=px, allow_redirects=True
+                ) as resp:
+                    await resp.text()
+                    logger.info(f"iwara warmup status: {resp.status}")
+            except Exception as exc:
+                logger.warning(f"iwara warmup failed: {exc}")
+            finally:
+                self._warmup_done = True
 
     def _apply_manual_cookies(self, session: aiohttp.ClientSession):
         cookie_text = get_str_config(self.config, "request_cookie", "")
@@ -175,13 +206,7 @@ class IwaraAPI:
 
     @staticmethod
     def _is_cf_challenge(content: str) -> bool:
-        lower = (content or "").lower()
-        return (
-            "just a moment" in lower
-            or "cf-chl" in lower
-            or "cloudflare" in lower
-            or "cf-mitigated" in lower
-        )
+        return _is_cf_error_text(content)
 
     def _get_scraper(self):
         if cloudscraper is None:
