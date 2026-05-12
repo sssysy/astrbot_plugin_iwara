@@ -10,7 +10,6 @@ from astrbot.api import logger
 from .iwara_api import IwaraAPI
 from .iwara_helpers import (
     extract_items,
-    extract_tags,
     get_int_config,
     get_str_config,
     get_text,
@@ -96,7 +95,6 @@ async def search_by_type(
         item
         for item in items
         if lowered in get_text(item, "title").lower()
-        or lowered in " ".join(extract_tags(item)).lower()
     ][:limit]
 
 
