@@ -8,8 +8,11 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - 相关视频、评论列表、点赞用户查询
 - 热门内容（视频/图片）
 - 用户资料查询
+- 用户视频/图片列表浏览
+- 用户粉丝/关注列表查看
 - 图文消息链返回（搜索、详情、直链尽量附封面）
 - 可选代理与图片打码等级配置
+- **订阅博主更新**（定时轮询，有新视频/图片自动通知）
 
 ## 命令
 
@@ -22,8 +25,16 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_likes <视频ID或链接>`
 - `/iwara_trending [video|image|all]`
 - `/iwara_user <用户名>`
+- `/iwara_uservideos <用户名>` — 查看用户视频列表
+- `/iwara_userimages <用户名>` — 查看用户图片列表
+- `/iwara_followers <用户名>` — 查看用户粉丝列表
+- `/iwara_following <用户名>` — 查看用户关注列表
 - `/iwara_probe`
 - `/iwara_diag`
+- **订阅相关：**
+  - `/iwara_sub <用户名>` — 订阅博主更新
+  - `/iwara_unsub <用户名>` — 取消订阅
+  - `/iwara_sublist` — 查看当前订阅列表
 
 示例：
 
@@ -35,6 +46,12 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_likes vsGv0RRqM4mVhE`
 - `/iwara_trending video`
 - `/iwara_user nightmate71`
+- `/iwara_uservideos nightmate71` — 查看用户的所有视频
+- `/iwara_userimages nightmate71` — 查看用户的所有图片
+- `/iwara_followers nightmate71` — 查看用户的粉丝
+- `/iwara_following nightmate71` — 查看用户的关注
+- `/iwara_sub nightmate71` — 订阅博主
+- `/iwara_sublist` — 查看订阅列表
 - `/iwara_probe`
 
 ## 配置
@@ -48,6 +65,7 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `image_max_kb`: 单图最大体积（KB）。
 - `image_censor_level`: 返回图片打码程度，支持 `off / low / medium / high`（`bytes` 模式下本地打码，不依赖第三方图床）。
 - `search_limit`: 搜索最多返回条数（1-10）。
+- `subscribe_poll_interval_min`: 订阅轮询间隔，分钟（5-1440，默认30分钟）。
 - `request_timeout_sec`: 请求超时秒数（5-60）。
 - `request_user_agent`: 请求 UA（默认已内置浏览器 UA）。
 - `request_referer`: 请求 Referer（默认 `https://www.iwara.tv/`）。
@@ -61,6 +79,7 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 
 - 直链解析基于 `iwara.md` 报告中的流程：从 `fileUrl` 提取 `fileId/expires/hash`，计算 `X-Version(SHA-1)` 后请求 `files.iwara.tv/file/{fileId}`。
 - `image_transport=bytes` 时会在插件内对图片字节做本地模糊（low/medium/high）；`url` 模式下仅发送原图 URL（不做打码）。
+- **订阅机制**：插件启动后注册定时任务，按 `subscribe_poll_interval_min` 间隔轮询已订阅用户的视频和图片列表。首次轮询记录所有已知ID，后续仅推送新发现的视频/图片。无需认证即可检测更新。
 
 ## 403 排障（Cloudflare）
 

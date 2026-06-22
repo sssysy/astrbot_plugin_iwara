@@ -1,6 +1,6 @@
 name: astrbot_plugin_iwara
 display_name: Iwara
-desc: Iwara 视频/图片搜索、详情、直链、评论、热门、用户资料
-version: v1.1.1
+desc: Iwara 视频/图片搜索、详情、直链、评论、热门、用户资料 + 订阅通知
+version: v1.2.0
 author: vmoranv
 repo: https://github.com/vmoranv/astrbot_plugin_iwara

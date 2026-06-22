@@ -74,6 +74,24 @@
     "hint": "1-10",
     "default": 5
   },
+  "subscribe_poll_interval_min": {
+    "description": "订阅轮询间隔（分钟）",
+    "type": "int",
+    "hint": "5-1440，默认30分钟",
+    "default": 30
+  },
+  "request_login_email": {
+    "description": "Iwara 登录邮箱（用于自动获取 Token，省去手动配置 Bearer Token）",
+    "type": "string",
+    "hint": "留空则跳过自动登录；需同时填写 request_login_password",
+    "default": ""
+  },
+  "request_login_password": {
+    "description": "Iwara 登录密码（与 request_login_email 配合使用）",
+    "type": "string",
+    "hint": "留空则跳过自动登录；密码明文存储请注意安全",
+    "default": ""
+  },
   "request_timeout_sec": {
     "description": "请求超时时间（秒）",
     "type": "int",
