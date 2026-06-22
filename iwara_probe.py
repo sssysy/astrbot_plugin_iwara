@@ -1,3 +1,10 @@
+"""Iwara API connectivity probe.
+
+Uses HttpExecutor internals directly (session, scraper, CF detection)
+to measure per-endpoint health — this is a diagnostic tool, not business
+logic, so it reaches into HTTP-layer details that IwaraAPI's facade
+intentionally hides.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -7,7 +14,12 @@ from typing import Any, Dict
 
 import aiohttp
 
-from .iwara_api import IwaraAPI, cloudscraper
+try:
+    import cloudscraper  # type: ignore
+except Exception:
+    cloudscraper = None
+
+from .iwara_api import IwaraAPI
 from .iwara_helpers import (
     get_str_config,
     get_int_config,
@@ -18,9 +30,10 @@ from .iwara_helpers import (
 
 
 async def run_probe(api: IwaraAPI) -> str:
-    config = api.config
+    config = api._config
+    http = api._http
     px = proxy_url(config)
-    engine = api._request_engine()
+    engine = http._request_engine()
     api_base = get_str_config(config, "api_base_url", "https://api.iwara.tv").rstrip(
         "/"
     )
@@ -45,7 +58,7 @@ async def run_probe(api: IwaraAPI) -> str:
         "",
     ]
     for label, url in targets:
-        result = await _probe_single(api, url)
+        result = await _probe_single(http, config, url)
         cf = "yes" if result["is_cf"] else "no"
         lines.append(
             f"[{label}] {result['status']} | engine={result['engine']} | cf={cf} | {result['cost_ms']}ms"
@@ -62,15 +75,16 @@ async def run_probe(api: IwaraAPI) -> str:
     return "\n".join(lines)
 
 
-async def _probe_single(api: IwaraAPI, url: str) -> Dict[str, Any]:
-    engine = api._request_engine()
+async def _probe_single(http, config: Dict[str, Any], url: str) -> Dict[str, Any]:
+    engine = http._request_engine()
     if engine == "cloudscraper":
-        return await _probe_cs(api, url)
+        return await _probe_cs(http, config, url)
     if engine == "aiohttp":
-        return await _probe_aiohttp(api, url)
-    first = await _probe_aiohttp(api, url)
+        return await _probe_aiohttp(http, config, url)
+    first = await _probe_aiohttp(http, config, url)
+    from .iwara_http import _is_cf_error_text
     if first["status"] == 403 and first["is_cf"] and cloudscraper is not None:
-        second = await _probe_cs(api, url)
+        second = await _probe_cs(http, config, url)
         if second["status"] != 403:
             return second
         second["engine"] = "aiohttp->cloudscraper"
@@ -78,12 +92,13 @@ async def _probe_single(api: IwaraAPI, url: str) -> Dict[str, Any]:
     return first
 
 
-async def _probe_aiohttp(api: IwaraAPI, url: str) -> Dict[str, Any]:
+async def _probe_aiohttp(http, config: Dict[str, Any], url: str) -> Dict[str, Any]:
+    from .iwara_http import _is_cf_error_text
     start = time.perf_counter()
-    session = await api._get_session()
-    px = proxy_url(api.config)
-    hdrs = _build_probe_headers(api.config)
-    timeout_sec = get_int_config(api.config, "request_timeout_sec", 15, 5, 60)
+    session = await http._get_session()
+    px = proxy_url(config)
+    hdrs = _build_probe_headers(config)
+    timeout_sec = get_int_config(config, "request_timeout_sec", 15, 5, 60)
     try:
         async with session.get(
             url,
@@ -96,7 +111,7 @@ async def _probe_aiohttp(api: IwaraAPI, url: str) -> Dict[str, Any]:
             return {
                 "status": resp.status,
                 "engine": "aiohttp",
-                "is_cf": api._is_cf_challenge(text)
+                "is_cf": _is_cf_error_text(text)
                 or (resp.status == 403 and looks_binary_body_text(text)),
                 "preview": _safe_preview(text),
                 "error": "",
@@ -113,15 +128,16 @@ async def _probe_aiohttp(api: IwaraAPI, url: str) -> Dict[str, Any]:
         }
 
 
-async def _probe_cs(api: IwaraAPI, url: str) -> Dict[str, Any]:
+async def _probe_cs(http, config: Dict[str, Any], url: str) -> Dict[str, Any]:
+    from .iwara_http import _is_cf_error_text
     start = time.perf_counter()
-    px = proxy_url(api.config)
-    timeout_sec = get_int_config(api.config, "request_timeout_sec", 15, 5, 60)
+    px = proxy_url(config)
+    timeout_sec = get_int_config(config, "request_timeout_sec", 15, 5, 60)
     proxy_map = {"http": px, "https": px} if px else None
-    hdrs = _build_probe_headers(api.config)
+    hdrs = _build_probe_headers(config)
 
     def _do():
-        return api._get_scraper().get(
+        return http._get_scraper().get(
             url, headers=hdrs, proxies=proxy_map, timeout=timeout_sec
         )
 
@@ -131,7 +147,7 @@ async def _probe_cs(api: IwaraAPI, url: str) -> Dict[str, Any]:
         return {
             "status": response.status_code,
             "engine": "cloudscraper",
-            "is_cf": api._is_cf_challenge(text)
+            "is_cf": _is_cf_error_text(text)
             or (response.status_code == 403 and looks_binary_body_text(text)),
             "preview": _safe_preview(text),
             "error": "",

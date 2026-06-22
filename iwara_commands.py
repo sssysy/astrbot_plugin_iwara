@@ -182,7 +182,7 @@ async def make_chain(
 
 
 async def download_image(config: Dict[str, Any], api: IwaraAPI, image_url: str):
-    session = await api._get_session()
+    session = await api.get_session()
     px = proxy_url(config)
     timeout_sec = get_int_config(config, "image_fetch_timeout_sec", 8, 3, 30)
     hdrs = build_request_headers(config)
