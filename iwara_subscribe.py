@@ -164,7 +164,8 @@ async def poll_user_content(
 
     known_vid = set(store.get_known_video_ids(username))
     known_img = set(store.get_known_image_ids(username))
-
+    first_poll = not known_vid and not known_img # 没有已知vid和img时就是首次拉取
+    
     new_videos: List[Dict[str, Any]] = []
     new_images: List[Dict[str, Any]] = []
 
@@ -181,7 +182,7 @@ async def poll_user_content(
         )
         for item in _extract_results(data):
             vid = str(item.get("id", ""))
-            if vid and vid not in known_vid:
+            if vid and vid not in known_vid and not first_poll:
                 new_videos.append(item)
             known_vid.add(vid)
     except Exception:
@@ -200,7 +201,7 @@ async def poll_user_content(
         )
         for item in _extract_results(data):
             iid = str(item.get("id", ""))
-            if iid and iid not in known_img:
+            if iid and iid not in known_img and not first_poll:
                 new_images.append(item)
             known_img.add(iid)
     except Exception:
