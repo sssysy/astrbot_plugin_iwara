@@ -164,7 +164,8 @@ async def poll_user_content(
 
     known_vid = set(store.get_known_video_ids(username))
     known_img = set(store.get_known_image_ids(username))
-    first_poll = not known_vid and not known_img # 没有已知vid和img时就是首次拉取
+    first_poll = not entry.get("polled", False) and not known_vid and not known_img
+    entry["polled"] = True
     
     new_videos: List[Dict[str, Any]] = []
     new_images: List[Dict[str, Any]] = []
